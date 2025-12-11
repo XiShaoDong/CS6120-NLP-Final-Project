@@ -8,14 +8,14 @@ This project implements a multi-label text classification system to predict medi
 
 ## 📚 Project Overview
 
-**Goal:** Predict what medical conditions a drug can treat based on its chemical composition, mechanism of action, and pharmacodynamics.
+**Goal:** Predict what medical conditions a drug can treat based on its chemical composition and mechanism of action.
 
 **Approach:**
-1. **Baseline Models**: TF-IDF + Logistic Regression, SentenceTransformers
+1. **Baseline Models**: TF-IDF + Logistic Regression, SentenceTransformers + Classifier
 2. **Advanced Model**: Fine-tuned BioBERT (biomedical BERT)
 3. **Task Type**: Multi-label text classification
 
-**Dataset:** DrugBank Simplified (17,000+ drugs with detailed medical descriptions)
+**Dataset:** MID (Medicine Information Database) - 147,831+ drug entries with 509 medical condition labels
 
 ---
 
@@ -24,21 +24,20 @@ This project implements a multi-label text classification system to predict medi
 ```
 CS6120-NLP-Final-Project/
 ├── README.md                          # This file
-├── NLP_project_analysis.md            # Detailed project analysis and recommendations
-├── drugbank_simplified.csv            # Main dataset
-├── Medicine_Details.csv               # Alternative dataset
-├── MID.csv                            # Large supplementary dataset
+├── extract_MID2_data.py               # Data extraction script for MID dataset
+├── final_masked_data.csv              # Processed MID dataset 
+├── MID.xlsx                           # Raw MID dataset (Excel format)
 │
-├── 1_data_preprocessing.ipynb         # Part 1: Data loading, cleaning, NER extraction
+├── 1_data_preprocessing.ipynb         # Part 1: Data loading, cleaning, multi-label encoding
 ├── 2_baseline_models.ipynb            # Part 2: TF-IDF and SentenceTransformers baselines
-├── 3_biobert_model.ipynb              # Part 3: BioBERT fine-tuning
+├── 3_biobert_model.ipynb              # Part 3: BioBERT fine-tuning (Google Colab)
 │
-└── outputs/                           # Generated files (created during execution)
-    ├── X_train.npy, X_val.npy, X_test.npy
-    ├── y_train.npy, y_val.npy, y_test.npy
-    ├── mlb.pkl
-    ├── tfidf_vectorizer.pkl
-    ├── biobert_finetuned/
+└── data/                              # Generated files (created during execution)
+    ├── X_train_text.npy
+    ├── X_test_text.npy
+    ├── y_train.npy
+    ├── y_test.npy
+    ├── mlb.pkl                        # MultiLabelBinarizer
     └── ...
 ```
 
@@ -62,10 +61,8 @@ cd CS6120-NLP-Final-Project
 
 # Install dependencies (run in notebook or terminal)
 pip install pandas numpy matplotlib seaborn
-pip install transformers datasets torch
+pip install transformers datasets torch accelerate
 pip install sentence-transformers scikit-learn
-pip install scispacy
-pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.1/en_core_sci_md-0.5.1.tar.gz
 pip install wordcloud plotly tqdm
 ```
 
@@ -75,41 +72,46 @@ pip install wordcloud plotly tqdm
 ```bash
 jupyter notebook 1_data_preprocessing.ipynb
 ```
-- Loads and cleans DrugBank dataset
-- Extracts medical conditions using NER
-- Creates multi-label encodings
-- Saves preprocessed data
-- **Runtime:** ~20-30 minutes
+- Loads MID dataset (final_masked_data.csv)
+- Explores data distribution (147,831 drugs, 509 labels)
+- Creates multi-label encodings using MultiLabelBinarizer
+- Splits data: 80% train, 20% test (then 80/20 train/val split)
+- Saves preprocessed data to `data/` directory
+- **Runtime:** ~10-15 minutes
 
 **Step 2: Baseline Models** (Recommended)
 ```bash
 jupyter notebook 2_baseline_models.ipynb
 ```
-- TF-IDF + Logistic Regression
-- SentenceTransformers + Classifier
-- Evaluation and comparison
-- **Runtime:** ~10-15 minutes
+- **Model 1**: TF-IDF (5000 features) + Logistic Regression
+  - Macro F1: ~0.43, Micro F1: ~0.95
+- **Model 2**: SentenceTransformers (all-MiniLM-L6-v2) + Logistic Regression
+  - Macro F1: ~0.31, Micro F1: ~0.89
+- Comprehensive evaluation and comparison
+- **Runtime:** ~20-30 minutes
 
-**Step 3: BioBERT Fine-tuning** (Main Model)
+**Step 3: BioBERT Fine-tuning** (Main Model) - **Google Colab Required**
 ```bash
 jupyter notebook 3_biobert_model.ipynb
 ```
-- Fine-tune BioBERT on drug indication data
-- Evaluate on test set
-- Compare with baselines
+- Fine-tune BioBERT (dmis-lab/biobert-v1.1) on drug indication data
+- Multi-label classification with 509 labels
+- Training: 3 epochs, batch size 8, learning rate 2e-5
+- Evaluate on test set and compare with baselines
 - **Runtime:** ~2-4 hours (GPU) or ~8-12 hours (CPU)
+- **Note:** Designed for Google Colab with GPU support
 
 ---
 
 ## 📊 Expected Results
 
-| Model | F1 (Macro) | F1 (Micro) | Hamming Loss |
-|-------|------------|------------|--------------|
-| TF-IDF + LR | ~0.45-0.55 | ~0.60-0.70 | ~0.05-0.10 |
-| SentenceEmb + LR | ~0.50-0.60 | ~0.65-0.75 | ~0.04-0.08 |
-| **BioBERT** | **~0.65-0.75** | **~0.75-0.85** | **~0.02-0.05** |
+| Model | F1 (Macro) | F1 (Micro) | Hamming Loss | Exact Match |
+|-------|------------|------------|--------------|-------------|
+| TF-IDF + LR | ~0.43 | ~0.95 | ~0.0003 | ~0.89 |
+| SentenceEmb + LR | ~0.31 | ~0.89 | ~0.0006 | ~0.77 |
+| **BioBERT** | **TBD** | **TBD** | **TBD** | **TBD** |
 
-*Note: Actual results may vary based on data preprocessing choices and hyperparameters*
+*Note: BioBERT results depend on training (Google Colab with GPU recommended)*
 
 ---
 
@@ -118,20 +120,22 @@ jupyter notebook 3_biobert_model.ipynb
 ### Classical NLP (Notebook 2)
 - ✅ **Tokenization & Text Preprocessing**
 - ✅ **TF-IDF Vectorization**: Bag-of-words with importance weighting
-- ✅ **Feature Engineering**: N-grams, min/max document frequency
-- ✅ **Sparse vs Dense Representations**
+- ✅ **Feature Engineering**: Unigrams and bigrams, min/max document frequency
+- ✅ **Sparse Representations**: 5000 features from vocabulary
+- ✅ **Multi-label Classification**: OneVsRestClassifier with Logistic Regression
 
-### Modern NLP (Notebook 3)
+### Modern NLP (Notebook 2 & 3)
+- ✅ **Sentence Embeddings**: Pre-trained SentenceTransformers (all-MiniLM-L6-v2)
+- ✅ **Dense Representations**: 384-dimensional embeddings
 - ✅ **Transfer Learning**: Using pre-trained BioBERT
-- ✅ **Transformer Architecture**: Attention mechanisms
-- ✅ **Contextualized Embeddings**: Word meaning depends on context
+- ✅ **Transformer Architecture**: BERT-based attention mechanisms
 - ✅ **Fine-tuning Strategies**: Domain adaptation for biomedical text
-- ✅ **Multi-label Classification**: Predicting multiple labels per sample
+- ✅ **Multi-label Classification**: 509 medical conditions per drug
 
-### Medical NLP (Notebook 1)
-- ✅ **Named Entity Recognition (NER)**: Extracting disease entities
-- ✅ **Medical Text Processing**: Handling scientific terminology
-- ✅ **Domain-Specific Models**: BioBERT, ScispaCy
+### Evaluation Metrics
+- ✅ **Macro/Micro F1 Scores**: Precision, recall, F1-score
+- ✅ **Hamming Loss**: Label-wise accuracy
+- ✅ **Exact Match Ratio**: Full prediction accuracy
 
 ---
 
@@ -139,15 +143,15 @@ jupyter notebook 3_biobert_model.ipynb
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Raw DrugBank Data                         │
+│                    Raw Medicine Data                         │
 │  (Drug descriptions, indications, mechanisms)                │
 └─────────────────────┬───────────────────────────────────────┘
                       │
                       ▼
 ┌─────────────────────────────────────────────────────────────┐
 │            Notebook 1: Data Preprocessing                    │
-│  • Clean text (remove references, HTML)                     │
-│  • Extract medical conditions using NER                     │
+│  • Load MID dataset (final_masked_data.csv)                  │
+│  • Parse medical conditions from labels                     │
 │  • Create multi-label encodings                             │
 │  • Train/Val/Test split                                      │
 └─────────────────────┬───────────────────────────────────────┘
@@ -175,9 +179,9 @@ jupyter notebook 3_biobert_model.ipynb
 
 ## 💡 Key Features
 
-1. **Multi-Label Classification**: Each drug can treat multiple conditions
+1. **Multi-Label Classification**: Each drug can treat multiple conditions (509 labels)
 2. **Biomedical NLP**: Uses domain-specific pre-trained models (BioBERT)
-3. **Medical NER**: Automatically extracts disease entities from text
+3. **Sentence Embeddings**: Dense representations using SentenceTransformers
 4. **Comprehensive Evaluation**: Multiple metrics (F1, precision, recall, Hamming loss)
 5. **Baseline Comparison**: Shows improvement from classical to modern NLP
 
@@ -190,7 +194,7 @@ jupyter notebook 3_biobert_model.ipynb
 - [x] Implement classical NLP baseline (TF-IDF)
 - [x] Implement embedding-based baseline (SentenceTransformers)
 - [x] Fine-tune transformer model (BioBERT)
-- [x] Multi-label classification with 200+ classes
+- [x] Multi-label classification with 509 classes
 - [x] Comprehensive evaluation and comparison
 - [x] Well-documented Jupyter notebooks
 
@@ -198,17 +202,54 @@ jupyter notebook 3_biobert_model.ipynb
 
 ## 📝 Data Description
 
+### Dataset Statistics
+- **Total drug entries**: 147,831
+- **Number of unique labels**: 509 medical conditions
+- **Average labels per drug**: 1.57
+- **Label range**: 1-9 conditions per drug
+- **Data split**: 80% train, 20% test (with 20% of train as validation)
+
 ### Input Features (X)
 Combination of:
-- **Description**: Chemical composition, molecular structure
-- **Mechanism of Action**: How the drug works biologically
-- **Pharmacodynamics**: Drug effects on the body
+- **Drug Composition (CONTAINS)**: Chemical composition and active ingredients
+- **Mechanism of Action (HOW_WORKS)**: How the drug works biologically
+- **Format**: "Drug Composition: [composition] Mechanism of Action: [mechanism]"
 
 ### Output Labels (y)
-- **Medical Conditions**: Multi-hot encoded vector
-- **Examples**: cancer, hypertension, diabetes, infection, pain, etc.
-- **Number of Labels**: ~200-300 (frequent conditions)
-- **Format**: Binary matrix (samples × conditions)
+- **Medical Conditions**: Multi-hot encoded binary vector (509 dimensions)
+- **Top conditions**: 
+  - Bacterial infections (20,439 samples)
+  - Pain relief (13,110 samples)
+  - Gastroesophageal reflux disease (10,297 samples)
+  - Type 2 diabetes mellitus (8,966 samples)
+  - Hypertension (7,587 samples)
+- **Format**: Binary matrix (samples × 509 conditions)
+
+---
+
+## 🧹 Data Preprocessing Pipeline
+
+We applied a structured preprocessing pipeline (available in `extract_MID2_data.py`) to prepare the data:
+
+1. **Text Cleaning & Normalization**
+   - Preserved newlines in `USES` column to distinguish multiple conditions
+   - Normalized whitespace and removed carriage returns in feature columns
+   - Removed unrelated metadata and empty values
+
+2. **Label Extraction**
+   - Extracted medical conditions by splitting `USES` on newlines
+   - Removed numbering (e.g., "1.") and "Treatment of" prefixes
+   - Filtered out short labels (length < 3)
+
+3. **Data Filtering & Deduplication**
+   - Removed duplicates based on Drug Name and Composition
+   - Filtered out conditions appearing fewer than 5 times (min_freq=5)
+   - Excluded samples with no valid labels
+
+4. **Input Feature Construction**
+   - Merged relevant fields into a unified text description:
+     `Drug Composition: [CONTAINS] Mechanism of Action: [HOW_WORKS]`
+   - This text became the input for all models
 
 ---
 
@@ -217,27 +258,20 @@ Combination of:
 ### Common Issues
 
 **1. Out of Memory (OOM) during BioBERT training**
-```python
-# In notebook 3, reduce batch size:
-per_device_train_batch_size=4  # instead of 8
-```
+- Use Google Colab with GPU (Tesla T4 or better)
+- Reduce batch size in training arguments (e.g., from 8 to 4)
+- Reduce max_length in tokenizer (e.g., from 512 to 256)
 
-**2. NER extraction too slow**
-```python
-# In notebook 1, use smaller sample:
-df_sample = df.head(5000)  # Test on smaller subset first
-```
+**2. Missing data files**
+- Ensure you run Notebook 1 first to generate data files
+- Check that `data/` directory exists with .npy and .pkl files
 
 **3. GPU not detected**
-```python
-# Install PyTorch with CUDA:
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-```
+- For BioBERT training, use Google Colab with GPU runtime
+- Runtime → Change runtime type → GPU
 
-**4. Missing libraries**
-```bash
-# Run all install commands in notebooks sequentially
-```
+**4. Module import errors**
+- Install all required packages: `pip install transformers datasets torch accelerate sentence-transformers scikit-learn`
 
 ---
 
@@ -249,13 +283,11 @@ pip install torch torchvision torchaudio --index-url https://download.pytorch.or
 - [BERT: Pre-training of Deep Bidirectional Transformers](https://arxiv.org/abs/1810.04805)
 
 ### Datasets
-- [DrugBank Database](https://go.drugbank.com/)
-- [PubMed](https://pubmed.ncbi.nlm.nih.gov/)
+- [MID (Medicine Information Database)](https://data.mendeley.com/datasets/2vk5khfn6v/3/)
 
 ### Models
 - [BioBERT on HuggingFace](https://huggingface.co/dmis-lab/biobert-v1.1)
 - [SentenceTransformers](https://www.sbert.net/)
-- [ScispaCy](https://allenai.github.io/scispacy/)
 
 ---
 
@@ -275,16 +307,11 @@ This project is for educational purposes as part of an NLP course.
 
 ## 🙏 Acknowledgments
 
-- DrugBank for providing comprehensive drug data
+- MID (Medicine Information Database) for comprehensive drug data
 - HuggingFace for transformer models and libraries
-- AllenAI for ScispaCy medical NLP tools
 - dmis-lab for BioBERT pre-trained model
-
----
-
-## 📧 Contact
-
-For questions or issues, please refer to the `NLP_project_analysis.md` file for detailed explanations or create an issue in the repository.
+- SentenceTransformers for embedding models
+- Google Colab for providing free GPU resources
 
 ---
 
